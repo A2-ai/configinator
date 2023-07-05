@@ -10,41 +10,43 @@ if (!requireNamespace("gert", quietly = TRUE)) {
 library(shiny)
 
 ui <- fluidPage(
-  titlePanel("🐤 Configinator"),
+  h1("🐤 Configinator"),
   uiOutput("hostname"),
   fluidRow(
     column(
       6,
-      h3("Git"),
+      h2("Git"),
       uiOutput("missing_git"),
       textInput("git_user_name", "Full Name"),
       textInput("git_user_email", "Email"),
       actionButton("set_git_config", "Set config"),
-      h4("Current git configurations set"),
+      h4("Current git config"),
       tableOutput("git_name")
     ),
     column(
       6,
-      h3("SSH"),
+      h2("SSH"),
       p(
         "If you don't know how to obtain an SSH key, see ",
         a(
           style = "font-weight: bold;",
-          "How to obtain an SSH key",
+          "Obtaining an SSH key",
           href = "https://a2-ai.atlassian.net/l/cp/kz10w0fn",
           target = "_blank"
         ),
-        " on Confluence."
+        " on Confluence. Keep in mind there will be two authorized keys listed by default, these are normal."
       ),
+      h4("Add an SSH key"),
       textInput(
         "ssh_key",
-        "Add an SSH key",
+        label = NULL,
         width = "auto",
         placeholder = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDREhaDeDd4NeG/ClfkByKHUbPgQwuIac5XYwE+R3MDU example-device"
       ),
       actionButton("add_ssh_key", "Add key"),
       uiOutput("ssh_result"),
-      uiOutput("authorized_ssh_keys")
+      h4("Authorized SSH keys"),
+      tableOutput("authorized_ssh_keys")
     )
   )
 )
@@ -137,7 +139,7 @@ server <- function(input, output) {
     system2("cat", "~/.ssh/authorized_keys", stdout = TRUE)
   })
   output$hostname <- renderUI(
-    p("running at ", system2("hostname", stdout = TRUE))
+    p("running at ", system2("hostname", stdout = TRUE), "(make sure this isn't running on your laptop!)")
   )
 
   observeEvent(input$done, {
