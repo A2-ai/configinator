@@ -43,7 +43,8 @@ ui <- fluidPage(
         placeholder = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDREhaDeDd4NeG/ClfkByKHUbPgQwuIac5XYwE+R3MDU example-device"
       ),
       actionButton("add_ssh_key", "Add key"),
-      uiOutput("ssh_result")
+      uiOutput("ssh_result"),
+      uiOutput("authorized_ssh_keys")
     )
   )
 )
@@ -131,6 +132,9 @@ server <- function(input, output) {
         "SSH key added successfully!"
       )
     }
+  })
+  output$authorized_ssh_keys <- renderTable({
+    system2("cat", "~/.ssh/authorized_keys", stdout = TRUE)
   })
   output$hostname <- renderUI(
     p("running at ", system2("hostname", stdout = TRUE))
