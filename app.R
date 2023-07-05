@@ -1,81 +1,90 @@
-if (!requireNamespace("miniUI", quietly = TRUE)) {
-  message("installing miniUI so can run config app")
-  install.packages("miniUI")
+if (!requireNamespace("shiny", quietly = TRUE)) {
+  message("Installing shiny for configinator...")
+  install.packages("shiny")
 }
 if (!requireNamespace("gert", quietly = TRUE)) {
-  message("installing gert so can run config app")
+  message("Installing gert for configinator...")
   install.packages("gert")
 }
+
 library(shiny)
-library(miniUI)
-# Define UI for application that draws a histogram
-ui <- miniPage(
-  
-  # Application title
-  gadgetTitleBar("System config"),
-  miniContentPanel(
-    column(6,
-           uiOutput("missing_git"),
-           textInput("git_user_name", "user.name"),
-           textInput("git_user_email", "user.email"),
-           actionButton("set_git_config", "Set Config"),
-           h4("Current git configurations set:"),
-           tableOutput("git_name")
+
+ui <- fluidPage(
+  titlePanel("🐤 Configinator"),
+  uiOutput("hostname"),
+  fluidRow(
+    column(
+      6,
+      h3("Git"),
+      uiOutput("missing_git"),
+      textInput("git_user_name", "Full Name"),
+      textInput("git_user_email", "Email"),
+      actionButton("set_git_config", "Set config"),
+      h4("Current git configurations set"),
+      tableOutput("git_name")
     ),
-    column(6,
-           actionButton("show_ssh_instructions", "Instructions for ssh"),
-           h3("Upload tarball of ssh keys"),
-           fileInput("ssh_key", NULL, buttonLabel = "upload..."),
-           uiOutput('ssh_result')
+    column(
+      6,
+      h3("SSH"),
+      p(
+        "If you don't know how to obtain an SSH key, see ",
+        a(
+          style = "font-weight: bold;",
+          "How to obtain an SSH key",
+          href = "https://a2-ai.atlassian.net/l/cp/kz10w0fn",
+          target = "_blank"
+        ),
+        " on Confluence."
+      ),
+      textInput(
+        "ssh_key",
+        "Add an SSH key",
+        width = "auto",
+        placeholder = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDREhaDeDd4NeG/ClfkByKHUbPgQwuIac5XYwE+R3MDU example-device"
+      ),
+      actionButton("add_ssh_key", "Add key"),
+      uiOutput("ssh_result")
     )
   )
 )
 
 is_defined_value <- function(.x) {
-  if(is.null(.x) || .x == "") {
+  if (is.null(.x) || .x == "") {
     return(FALSE)
   }
   return(TRUE)
 }
-# Define server logic required to draw a histogram
+
 server <- function(input, output) {
-  dataModal <- function(failed = FALSE) {
-    modalDialog(
-      h4("To add the ssh keys from your laptop onto your workflow, run the following commands from your laptop terminal"),
-      wellPanel(tags$p('cd ~/.ssh'), tags$p('tar -czvf ~/Desktop/keys.tar.gz id_rsa id_rsa.pub')),
-      h4("upload the resulting tarball (keys.tar.gz) available on your desktop"),
-      h4('You only need to do this once per disk'),
-      footer = modalButton("Cancel")
-    )
-  }
-  
-  # Show modal when button is clicked.
-  observeEvent(input$show_ssh_instructions, {
-    showModal(dataModal())
-  })
-  
-  config_changed <- eventReactive(input$set_git_config, {
-    values_set <- c()
-    if (is_defined_value(input$git_user_email)) {
-      gert::git_config_global_set("user.email", input$git_user_email) 
-      values_set <- c(values_set, "user.email")
-    }
-    if (is_defined_value(input$git_user_name)) {
-      gert::git_config_global_set("user.name", input$git_user_name) 
-      values_set <- c(values_set, "user.name")
-    }
-    if (!length(values_set)) {
-      return(NULL)
-    }
-    return(values_set)
-  }, ignoreNULL = FALSE)
-  
+  config_changed <- eventReactive(input$set_git_config,
+    {
+      values_set <- c()
+      if (is_defined_value(input$git_user_email)) {
+        gert::git_config_global_set("user.email", input$git_user_email)
+        values_set <- c(values_set, "user.email")
+      }
+      if (is_defined_value(input$git_user_name)) {
+        gert::git_config_global_set("user.name", input$git_user_name)
+        values_set <- c(values_set, "user.name")
+      }
+      if (!length(values_set)) {
+        return(NULL)
+      }
+      return(values_set)
+    },
+    ignoreNULL = FALSE
+  )
+
   git_config_vals <- reactive({
     # reactive as want to run this at beginning so can't be eventreactive
     config_changed()
     gert::git_config_global()
-  }) 
-  
+  })
+
+  git_globals_set <- reactive({
+    input$git_user_email
+  })
+
   git_config_suggestions <- reactive({
     current_config <- git_config_vals()
     missings <- c()
@@ -94,56 +103,44 @@ server <- function(input, output) {
     req(git_config_suggestions())
     wellPanel(
       h3("please set the following config item(s):"),
-      h3(tags$span(style="color:red", paste(git_config_suggestions(), collapse = ", ")))
-    )        
+      h3(tags$span(style = "color:red", paste(git_config_suggestions(), collapse = ", ")))
+    )
   })
   output$git_name <- renderTable({
     git_config_vals()
   })
-  
-  ssh_copy <- reactive({
-    req(input$ssh_key)
-    ex_dir <- file.path(tempdir(), "ssh_keys")
-    if (fs::dir_exists(ex_dir)) {
-      fs::dir_delete(ex_dir)
-    }
-    fs::dir_create(ex_dir, recurse = TRUE)
-    withr::with_dir(ex_dir, {
-      untar(input$ssh_key$datapath)
-    })
-    id_rsa_pub <- file.path(ex_dir, "id_rsa.pub")
-    id_rsa <- file.path(ex_dir, "id_rsa")
-    copied_files <- c() 
-    if (fs::file_exists(id_rsa_pub)) {
-      fs::file_copy(id_rsa_pub, "~/.ssh/id_rsa.pub", overwrite = TRUE)
-      fs::file_chmod("~/.ssh/id_rsa.pub", "644")
-      copied_files <- c(copied_files, "id_rsa.pub")
-    }
-    if (fs::file_exists(id_rsa)) {
-      fs::file_copy(id_rsa, "~/.ssh/id_rsa", overwrite = TRUE)
-      fs::file_chmod("~/.ssh/id_rsa", "600")
-      copied_files <- c(copied_files, "id_rsa")
-    }
-    fs::file_chmod("~/.ssh/authorized_keys", "666")
-    file.append("~/.ssh/authorized_keys", "~/.ssh/id_rsa.pub")
-    fs::file_chmod("~/.ssh/authorized_keys", "600")
-    if (!length(copied_files)) {
-      return(NULL)
-    }
-    copied_files
+
+  append_ssh_key <- reactive({
+    req(input$add_ssh_key)
+
+    # Append key to authorized keys
+    system2(paste("echo", input$ssh_key, ">> ~/.ssh/authorized_keys"))
   })
   output$ssh_result <- renderUI({
-    req(ssh_copy())
-    wellPanel(
-      h3("We have set the following key file(s):"),
-      h3(tags$span(style="color:red", paste(ssh_copy(), collapse = ", ")))
-    ) 
+    result <- append_ssh_key()
+    req(result)
+
+    if (result != 0) {
+      p(
+        style = "color:red",
+        "Error adding SSH key"
+      )
+    } else {
+      p(
+        style = "color:green",
+        "SSH key added successfully!"
+      )
+    }
   })
-  
+  output$hostname <- renderUI(
+    p("running at ", system2("hostname", stdout = TRUE))
+  )
+
   observeEvent(input$done, {
     stopApp()
   })
 }
 
-# Run the application 
-runGadget(ui, server)
+# Run the application
+app <- shinyApp(ui, server)
+runApp(app, launch.browser = FALSE)
