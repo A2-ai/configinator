@@ -112,7 +112,6 @@ server <- function(input, output) {
   output$git_name <- renderTable({
     git_config_vals()
   })
-
   append_ssh_key <- reactive({
     req(input$add_ssh_key)
 
@@ -149,4 +148,4 @@ server <- function(input, output) {
 
 # Run the application
 app <- shinyApp(ui, server)
-runApp(app, launch.browser = FALSE)
+runApp(app)
