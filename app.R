@@ -34,7 +34,7 @@ ui <- fluidPage(
           href = "https://a2-ai.atlassian.net/l/cp/kz10w0fn",
           target = "_blank"
         ),
-        " on Confluence. Keep in mind there will be two authorized keys listed by default, these are normal."
+        " on Confluence."
       ),
       h4("Add an SSH key"),
       textInput(
@@ -82,10 +82,6 @@ server <- function(input, output) {
     # reactive as want to run this at beginning so can't be eventreactive
     config_changed()
     gert::git_config_global()
-  })
-
-  git_globals_set <- reactive({
-    input$git_user_email
   })
 
   git_config_suggestions <- reactive({
