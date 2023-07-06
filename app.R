@@ -116,7 +116,7 @@ server <- function(input, output) {
     req(input$add_ssh_key)
 
     # Append key to authorized keys
-    system2(paste("echo", input$ssh_key, ">> ~/.ssh/authorized_keys"))
+    system2("echo", paste0("\"", input$ssh_key, "\" >> ~/.ssh/authorized_keys"))
   })
   output$ssh_result <- renderUI({
     result <- append_ssh_key()
